@@ -1,0 +1,90 @@
+---
+title: "HW6"
+output: html_document
+date: "2024-12-01"
+---
+
+```{r setup, include = FALSE}
+library(tidyverse)
+library(dplyr)
+library(purrr)
+library(ggplot2)
+options(scipen = 999) 
+```
+
+PROBLEM 2
+```{r}
+homicide = read_csv("homicide-data.csv")
+
+#create city-state variable
+homicide_df = homicide %>% mutate(city_state = str_c(city, state, sep = ", ")) 
+
+#create binary variable indicating whether the homicide is solved
+check_solved <- function(data, column, phrase) {
+  data %>%
+    mutate(solved = ifelse(grepl(phrase, .data[[column]]), "Yes", "No"))
+}
+
+homicide_df = check_solved(homicide_df, "disposition", "Closed by arrest")
+
+
+#omit Dallas, TX; Phoenix, AZ; and Kansas City, MO and Tulsa, AL; 
+#and making sure victim is Black or White
+homicide_tidy = homicide_df %>% 
+  filter(!(city_state == "Dallas, TX") ) %>% 
+  filter(!(city_state == "Phoenix, AZ")) %>%  
+  filter(!(city_state == "Kansas City, MO")) %>%  
+  filter(!(city_state == "Tulsa, AL")) %>% 
+  filter(victim_race == "Black" | victim_race == "White")
+
+
+#victim_age
+homicide_tidy = homicide_tidy %>% 
+  mutate(victim_age = as.numeric(gsub("Unknown", "NA", victim_age)))
+
+
+#creating binary variables
+homicide_tidy = homicide_tidy %>% 
+  mutate(solved_binary = as.numeric(disposition == "Closed by arrest"),
+         victim_race_binary = fct_relevel(victim_race, "White"),
+         victim_sex_binary = fct_relevel(victim_sex, "Male"))
+
+
+#glm for baltimore
+homicide_baltimore = homicide_tidy %>% filter(city_state == "Baltimore, MD")
+model1 = glm(solved_binary ~ victim_age + victim_race_binary + victim_sex_binary, data=homicide_baltimore, family=binomial())
+
+model1_tidy = model1 %>% broom::tidy(conf.int=TRUE, conf.level=0.95) %>% 
+  mutate(OR = exp(estimate)) |>
+  select(term, log_OR = estimate, OR, p.value, conf.low, conf.high) |> 
+  knitr::kable(digits = 3)
+```
+estimated odds ratio comparing male to female with all other variables fixed: 2.35, 95% CI: [0.584, 1.126]
+
+```{r}
+#glm for each city 
+
+glm_city_results = homicide_tidy %>%
+  nest(data = -city_state) %>% # Nest data by city
+  mutate(
+    model2 = map(data, ~ glm(solved_binary ~ victim_age + victim_race_binary + victim_sex_binary, 
+                            data = ., family = binomial())),
+    model2_tidy = map(model2, ~ broom::tidy(., exponentiate = TRUE, conf.int = TRUE)) # Get ORs and CIs
+  ) %>%
+  unnest(model2_tidy) 
+
+glm_city_results
+
+
+
+#Create a plot that shows the estimated ORs and CIs for each city. Organize cities according to estimated OR, and comment on the plot.
+glm_city_results %>% 
+  arrange(estimate) %>% 
+  ggplot(aes(x = city_state, y = estimate)) +
+  geom_point() +
+  geom_errorbar(aes(ymax = conf.high, ymin = conf.low, width = 0.1)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_y_continuous(limits = c(0, 5))
+
+
+```
