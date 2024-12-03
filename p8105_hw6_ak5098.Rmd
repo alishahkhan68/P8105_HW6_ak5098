@@ -128,17 +128,18 @@ birthwt_model2 = lm(bwt ~ blength + gaweeks, data=birthwt)
 #model3
 birthwt_model3 = lm(bwt ~ bhead + blength + babysex + bhead*blength + blength*babysex + bhead*babysex + bhead*blength*babysex, data=birthwt)
 
+
+
+
 #cross validation 
+#creating testing and training
 cv_df = crossv_mc(birthwt, 100) 
 
 cv_df =
   cv_df %>% 
   mutate(
     train = map(train, as_tibble),
-    test = map(test, as_tibble)) %>% 
-  mutate(
-    
-  )
+    test = map(test, as_tibble))
 
 
 #creating data frame with RMSE
@@ -167,4 +168,6 @@ cv_df_rmse %>%
   ggplot(aes(x = model, y = rmse)) + geom_violin()
 
 ```
-proposed regression model: financial income, average number of cigarettes smoked per day during pregnancy, gestational age in weeks as predictors. I picked these predictors because they are hypothesized factors that have an affect birthweight. 
+proposed regression model: financial income, average number of cigarettes smoked per day during pregnancy, gestational age in weeks as predictors. I picked these predictors because they are hypothesized factors that have an affect birthweight. Although I created this model based on hypothesized underlying factors, in the future I would check the Pearson correlation coefficients between the predictors and outcome before I used these variables as predictors. I decided to fit a linear model because all the variables are continuous.  
+
+Model comparison: Model 3 has the lowest RMSE values and highest overall density, indicating it is the best fitted model. Model 1 has very high RMSE, meaning it is probably not well fitted (again, in the future I would check correlation coefficient before putting those variables into a model). Model 2 is better fitted than Model 1 and worst fitted than Model 3. 
